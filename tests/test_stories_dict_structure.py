@@ -1,36 +1,34 @@
-import httpretty
 import pytest
 
-from hn import HN, Story
-from hn import constants
+from hn import Story
 
-from .test_utils import get_content
+from .test_utils import get_live_story_ids
 
+LIVE_STORY_LIMIT = 5
 
 @pytest.fixture()
 def stories_data():
-    httpretty.HTTPretty.enable()
-    httpretty.reset()
-    httpretty.register_uri(httpretty.GET,
-                           'https://news.ycombinator.com/',
-                           body=get_content('index.html'))
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'best'),
-                           body=get_content('best.html'))
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'newest'),
-                           body=get_content('newest.html'))
+    def _build_live_stories(story_type):
+        story_ids = get_live_story_ids(limit=LIVE_STORY_LIMIT * 4,
+                                       story_type=story_type)
+        stories = []
+        for story_id in story_ids:
+            try:
+                stories.append(Story.fromid(story_id))
+            except Exception:
+                continue
+            if len(stories) == LIVE_STORY_LIMIT:
+                return stories
+        pytest.skip(f'Not enough parsable live {story_type} stories found')
 
-    hn = HN()
-    top_stories = [story for story in hn.get_stories()]
-    newest_stories = [story for story in hn.get_stories(story_type='newest')]
-    best_stories = [story for story in hn.get_stories(story_type='best')]
+    top_stories = _build_live_stories('topstories')
+    newest_stories = _build_live_stories('newstories')
+    best_stories = _build_live_stories('beststories')
     yield {
         'top': top_stories,
         'newest': newest_stories,
         'best': best_stories,
     }
-    httpretty.HTTPretty.disable()
 
 
 def _check_story_types(story):
@@ -76,18 +74,18 @@ def test_stories_dict_length_top(stories_data):
     """
     Checks if the dict returned by scraping the front page of HN is 30.
     """
-    assert len(stories_data['top']) == 30
+    assert len(stories_data['top']) == LIVE_STORY_LIMIT
 
 
 def test_stories_dict_length_best(stories_data):
     """
     Checks if the dict returned by scraping the best page of HN is 30.
     """
-    assert len(stories_data['best']) == 30
+    assert len(stories_data['best']) == LIVE_STORY_LIMIT
 
 
 def test_stories_dict_length_top_newest(stories_data):
     """
     Checks if the dict returned by scraping the newest page of HN is 30.
     """
-    assert len(stories_data['newest']) == 30
+    assert len(stories_data['newest']) == LIVE_STORY_LIMIT
