@@ -1,14 +1,12 @@
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
 
-version = '2.0.0'
+version = '3.0.0'
 
 setup(
     name='HackerNews',
     version=version,
-    install_requires=['BeautifulSoup4>=4.3.1', 'requests'],
+    install_requires=['BeautifulSoup4>=4.3.1', 'requests', 'pydantic>=2.0'],
+    python_requires='>=3.8',
     author='Karan Goel',
     author_email='karan@goel.im',
     packages=['hn', 'tests'],
@@ -26,6 +24,11 @@ setup(
         'Natural Language :: English',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Internet',
         'Topic :: Internet :: WWW/HTTP :: Browsers',
         'Topic :: Internet :: WWW/HTTP :: Indexing/Search',
