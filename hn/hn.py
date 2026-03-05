@@ -138,7 +138,16 @@ class Story(BaseModel):
                                     break
 
                         match = re.match(r'.*item\?id=(\d+)', comment_href)
-                        comment_id = int(match.groups()[0]) if match else -1
+                        if match:
+                            comment_id = int(match.groups()[0])
+                        else:
+                            togg_anchor = header_span.find(
+                                'a', class_=re.compile(r'togg'))
+                            togg_id = togg_anchor.get('id') if togg_anchor else ''
+                            if togg_id and togg_id.isdigit():
+                                comment_id = int(togg_id)
+                            else:
+                                continue
 
                         # text representation of comment (unformatted)
                         body = comment_span.text if comment_span else ''
@@ -336,7 +345,13 @@ class HN:
             #-- Get the info about a story --#
 
             #-- Get the detail about a story --#
-            story_id = int(info.get('id')) if info.get('id') else -1
+            story_id = None
+            info_id = info.get('id')
+            if info_id:
+                try:
+                    story_id = int(info_id)
+                except (TypeError, ValueError):
+                    story_id = None
 
             # split in 2 cells, we need only second
             detail_cell = detail.find_all('td')[1]
@@ -365,7 +380,13 @@ class HN:
                 age_span = subline.find('span', class_='age')
                 published_time = age_span.find('a').text if age_span else ''
 
-                comments_link = f'{BASE_URL}/item?id={story_id}'
+                if story_id is None and age_span and age_span.find('a'):
+                    story_match = re.match(r'.*item\?id=(\d+)',
+                                           age_span.find('a').get('href'))
+                    if story_match:
+                        story_id = int(story_match.groups()[0])
+
+                comments_link = f'{BASE_URL}/item?id={story_id}' if story_id is not None else ''
                 num_comments = 0
                 for a_tag in subline.find_all('a'):
                     text = a_tag.text.replace('\xa0', ' ')
@@ -384,7 +405,7 @@ class HN:
                 published_time = ' '.join(detail_concern[3].strip().split()[
                                           :3])
                 comment_tag = detail_concern[4]
-                if story_id == -1:
+                if story_id is None:
                     story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
                         'href')).groups()[0])
                 comments_link = f'{BASE_URL}/item?id={story_id}'

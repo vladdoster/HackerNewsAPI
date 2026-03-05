@@ -6,6 +6,7 @@ import pytest
 from hn import Story
 
 HN_API_BASE = 'https://hacker-news.firebaseio.com/v0'
+MIN_DESCENDANTS_MANY_COMMENTS = 120
 
 
 def _get_json(url):
@@ -47,7 +48,7 @@ def live_story():
 def live_story_with_many_comments():
     try:
         story_id = _get_live_story_id(endpoint='beststories',
-                                      min_descendants=120)
+                                      min_descendants=MIN_DESCENDANTS_MANY_COMMENTS)
     except requests.RequestException as exc:
         pytest.skip(f'Unable to fetch live Hacker News stories: {exc}')
 

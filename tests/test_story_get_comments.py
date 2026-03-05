@@ -2,6 +2,8 @@ from random import randrange
 
 import pytest
 
+DELETED_COMMENT_ID = -1
+
 
 @pytest.fixture()
 def story_comments(live_story_with_many_comments):
@@ -10,7 +12,7 @@ def story_comments(live_story_with_many_comments):
 
 def test_get_comments_len(story_comments):
     """
-    Tests whether or not len(get_comments) > 90 if there are multiple pages
+    Tests whether or not len(get_comments) > 30 if there are multiple pages
     of comments.
     """
     assert len(story_comments) > 30
@@ -21,7 +23,7 @@ def test_comment_not_null(story_comments):
     Tests for null comments.
     """
     comment = story_comments[randrange(0, len(story_comments))]
-    if comment.comment_id == -1:
+    if comment.comment_id == DELETED_COMMENT_ID:
         assert comment.body == '[deleted]'
     else:
         assert comment.body is not None
