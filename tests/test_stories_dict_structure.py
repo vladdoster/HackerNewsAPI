@@ -23,8 +23,6 @@ class TestStoriesDict(unittest.TestCase):
                                                          'newest'),
                                body=get_content('newest.html'))
 
-        self.text_type = [str]
-
         self.hn = HN()
         self.top_stories = [story for story in self.hn.get_stories()]
         self.newest_stories = [story for story in self.hn.get_stories(
@@ -40,19 +38,17 @@ class TestStoriesDict(unittest.TestCase):
         Checks data type of each field of each story from front page.
         """
         for story in self.top_stories:
-            # testing for unicode or string
-            # because the types are mixed sometimes
             assert type(story.rank) == int
             assert type(story.story_id) == int
-            assert type(story.title) in self.text_type
-            assert type(story.link) in self.text_type
-            assert type(story.domain) in self.text_type
+            assert type(story.title) == str
+            assert type(story.link) == str
+            assert type(story.domain) == str
             assert type(story.points) == int
-            assert type(story.submitter) in self.text_type
-            assert type(story.published_time) in self.text_type
-            assert type(story.submitter_profile) in self.text_type
+            assert type(story.submitter) == str
+            assert type(story.published_time) == str
+            assert type(story.submitter_profile) == str
             assert type(story.num_comments) == int
-            assert type(story.comments_link) in self.text_type
+            assert type(story.comments_link) == str
             assert type(story.is_self) == bool
 
     def test_stories_dict_structure_newest(self):
@@ -60,19 +56,17 @@ class TestStoriesDict(unittest.TestCase):
         Checks data type of each field of each story from newest page
         """
         for story in self.newest_stories:
-            # testing for unicode or string
-            # because the types are mixed sometimes
             assert type(story.rank) == int
             assert type(story.story_id) == int
-            assert type(story.title) in self.text_type
-            assert type(story.link) in self.text_type
-            assert type(story.domain) in self.text_type
+            assert type(story.title) == str
+            assert type(story.link) == str
+            assert type(story.domain) == str
             assert type(story.points) == int
-            assert type(story.submitter) in self.text_type
-            assert type(story.published_time) in self.text_type
-            assert type(story.submitter_profile) in self.text_type
+            assert type(story.submitter) == str
+            assert type(story.published_time) == str
+            assert type(story.submitter_profile) == str
             assert type(story.num_comments) == int
-            assert type(story.comments_link) in self.text_type
+            assert type(story.comments_link) == str
             assert type(story.is_self) == bool
 
     def test_stories_dict_structure_best(self):
@@ -80,19 +74,17 @@ class TestStoriesDict(unittest.TestCase):
         Checks data type of each field of each story from best page
         """
         for story in self.best_stories:
-            # testing for unicode or string
-            # because the types are mixed sometimes
             assert type(story.rank) == int
             assert type(story.story_id) == int
-            assert type(story.title) in self.text_type
-            assert type(story.link) in self.text_type
-            assert type(story.domain) in self.text_type
+            assert type(story.title) == str
+            assert type(story.link) == str
+            assert type(story.domain) == str
             assert type(story.points) == int
-            assert type(story.submitter) in self.text_type
-            assert type(story.published_time) in self.text_type
-            assert type(story.submitter_profile) in self.text_type
+            assert type(story.submitter) == str
+            assert type(story.published_time) == str
+            assert type(story.submitter_profile) == str
             assert type(story.num_comments) == int
-            assert type(story.comments_link) in self.text_type
+            assert type(story.comments_link) == str
             assert type(story.is_self) == bool
 
     def test_stories_dict_length_top(self):
