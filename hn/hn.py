@@ -203,31 +203,75 @@ class Story(BaseModel):
         info_rows = info_table.find_all('tr')
 
         # title, domain
-        title_row = info_rows[0].find_all('td')[1]
+        # Handle both old (2 TDs) and new (3 TDs) HN format
+        title_cells = info_rows[0].find_all('td', class_='title')
+        title_row = title_cells[-1] if title_cells else info_rows[0].find_all('td')[1]
         title = title_row.find('a').text
-        try:
-            domain = title_row.find('span').string[2:-2]
-            # domain found
+
+        sitestr = title_row.find('span', class_='sitestr')
+        comhead = title_row.find('span', class_='comhead')
+        if sitestr:
+            # New HN format: domain in sitestr span
+            domain = sitestr.string
             is_self = False
             link = title_row.find('a').get('href')
-        except AttributeError:
+        elif comhead and comhead.string:
+            # Old HN format: domain in comhead span
+            domain = comhead.string[2:-2]
+            is_self = False
+            link = title_row.find('a').get('href')
+        else:
             # self post
             domain = BASE_URL
             is_self = True
             link = f'{BASE_URL}/item?id={item_id}'
 
         # points, user, time, comments
-        meta_row = info_rows[1].find_all('td')[1].contents
+        subtext_td = info_rows[1].find('td', class_='subtext')
+        if subtext_td is None:
+            subtext_td = info_rows[1].find_all('td')[1]
+
+        # New HN format wraps content in span.subline
+        subline = subtext_td.find('span', class_='subline')
+        container = subline if subline else subtext_td
+        meta_row = container.contents
 
         points = int(re.match(r'^(\d+)\spoint.*', meta_row[0].text).groups()[0])
-        submitter = meta_row[2].text
-        submitter_profile = f'{BASE_URL}/{meta_row[2].get("href")}'
-        published_time = ' '.join(meta_row[3].strip().split()[:3])
+
+        # Find submitter by searching for user link
+        user_link = container.find('a', href=re.compile(r'user\?id='))
+        if user_link:
+            submitter = user_link.text
+            href = user_link.get('href')
+            if href.startswith('http'):
+                submitter_profile = href
+            else:
+                submitter_profile = f'{BASE_URL}/{href}'
+        else:
+            submitter = meta_row[2].text
+            submitter_profile = f'{BASE_URL}/{meta_row[2].get("href")}'
+
+        # Find published time
+        age_span = container.find('span', class_='age')
+        if age_span:
+            published_time = age_span.text
+        else:
+            published_time = ' '.join(meta_row[3].strip().split()[:3])
+
         comments_link = f'{BASE_URL}/item?id={item_id}'
-        try:
-            num_comments = int(re.match(r'(\d+)\s.*', meta_row[
-                4].text).groups()[0])
-        except AttributeError:
+
+        # Find comment count from anchor containing "comment" text
+        comment_anchors = [a for a in container.find_all('a')
+                           if 'comment' in a.text.replace('\xa0', ' ').lower()]
+        if comment_anchors:
+            try:
+                num_comments = int(re.match(
+                    r'(\d+)\s.*',
+                    comment_anchors[-1].text.replace('\xa0', ' ')
+                ).groups()[0])
+            except AttributeError:
+                num_comments = 0
+        else:
             num_comments = 0
         story = Story(rank=rank, story_id=story_id, title=title, link=link,
                       domain=domain, points=points, submitter=submitter,

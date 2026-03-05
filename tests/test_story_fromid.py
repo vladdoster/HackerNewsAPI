@@ -41,3 +41,29 @@ def test_comment_for_fromid(story):
     assert len(comments) == 3
     assert comments[0].comment_id == 6115436
     assert comments[2].level == 2
+
+
+@pytest.fixture()
+def story_new_format():
+    httpretty.HTTPretty.enable()
+    httpretty.reset()
+    httpretty.register_uri(httpretty.GET,
+                           '%s/%s' % (constants.BASE_URL,
+                                      'item?id=6374031'),
+                           body=get_content('6374031_new.html'))
+    s = Story.fromid(6374031)
+    yield s
+    httpretty.HTTPretty.disable()
+
+
+def test_fromid_new_html_format(story_new_format):
+    """
+    Tests that Story.fromid works with the current HN HTML structure
+    where metadata is wrapped in a span.subline element.
+    """
+    assert story_new_format.title == 'Python API for Hacker News'
+    assert story_new_format.is_self is False
+    assert story_new_format.points > 0
+    assert story_new_format.submitter != ''
+    assert story_new_format.num_comments == 32
+    assert story_new_format.domain == 'github.com/thekarangoel'
