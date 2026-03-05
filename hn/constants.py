@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 BASE_URL = 'https://news.ycombinator.com'
 # seconds to sleep between 2 consecutive page requests

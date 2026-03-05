@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Hacker News API
@@ -9,6 +9,8 @@ Unofficial Python API for Hacker News.
 """
 
 import re
+
+from pydantic import BaseModel
 
 from .utils import get_soup, get_item_soup
 from .constants import BASE_URL
@@ -21,17 +23,6 @@ class HN(object):
 
     def __init__(self):
         self.more = ''
-
-    # def _get_next_page(self, soup):
-    #     """
-    #     Get the relative url of the next page (The "More" link at
-    #     the bottom of the page)
-    #     """
-    #     table = soup.findChildren('table')[2]  # table with all submissions
-    #     # the last row of the table contains the relative url of the next
-    #     # page
-    #     return table.findChildren(['tr'])[-1].find('a').get('href').replace(
-    #         BASE_URL, '').lstrip('//')
 
     def _get_zipped_rows(self, soup):
         """
@@ -74,8 +65,8 @@ class HN(object):
             # by default all stories are linking posts
             is_self = False
 
-            # the link doesn't contains "http" meaning an internal link
-            if link.find('item?id=') is -1:
+            # the link doesn't contain "item?id=" meaning an external link
+            if link.find('item?id=') == -1:
                 # slice " (abc.com) "
                 domain = info_cells[2].findAll('span')[1].string[2:-1]
             else:
@@ -129,9 +120,20 @@ class HN(object):
                 comment_count = -1
             #-- Get the detail about a story --#
 
-            story = Story(rank, story_id, title, link, domain, points,
-                          submitter, published_time, submitter_profile,
-                          num_comments, comments_link, is_self)
+            story = Story(
+                rank=rank,
+                story_id=story_id,
+                title=title,
+                link=link,
+                domain=domain,
+                points=points,
+                submitter=submitter,
+                published_time=published_time,
+                submitter_profile=submitter_profile,
+                num_comments=num_comments,
+                comments_link=comments_link,
+                is_self=is_self,
+            )
 
             all_stories.append(story)
 
@@ -155,7 +157,6 @@ class HN(object):
             limit = 30
 
         stories_found = 0
-        # self.more = story_type
         # while we still have more stories to find
         while stories_found < limit:
             # get current page soup
@@ -163,8 +164,6 @@ class HN(object):
             all_rows = self._get_zipped_rows(soup)
             # get a list of stories on current page
             stories = self._build_story(all_rows)
-            # move to next page
-            # self.more = self._get_next_page(soup)
 
             for story in stories:
                 yield story
@@ -188,29 +187,31 @@ class HN(object):
                 return
             if not leader.text == '':
                 item = leader.find_all('td')
-                yield User(item[1].text, '', item[2].text, item[3].text)
+                yield User(
+                    username=item[1].text,
+                    date_created='',
+                    karma=item[2].text,
+                    avg=item[3].text,
+                )
 
 
-class Story(object):
+class Story(BaseModel):
     """
     Story class represents one single story on HN
     """
 
-    def __init__(self, rank, story_id, title, link, domain, points,
-                 submitter, published_time, submitter_profile, num_comments,
-                 comments_link, is_self):
-        self.rank = rank  # the rank of story on the page
-        self.story_id = story_id  # the story's id
-        self.title = title  # the title of the story
-        self.link = link  # the url it points to (None for self posts)
-        self.domain = domain  # the domain of the link (None for self posts)
-        self.points = points  # the points/karma on the story
-        self.submitter = submitter  # the user who submitted the story
-        self.published_time = published_time  # publish time of story
-        self.submitter_profile = submitter_profile  # link to submitter profile
-        self.num_comments = num_comments  # the number of comments it has
-        self.comments_link = comments_link  # the link to the comments page
-        self.is_self = is_self  # Truw is a self post
+    rank: int
+    story_id: int
+    title: str
+    link: str
+    domain: str
+    points: int
+    submitter: str
+    published_time: str
+    submitter_profile: str
+    num_comments: int
+    comments_link: str
+    is_self: bool
 
     def __repr__(self):
         """
@@ -232,7 +233,7 @@ class Story(object):
 
         # the last row of the table contains the relative url of the next page
         anchor = table.findChildren(['tr'])[-1].find('a')
-        if anchor and anchor.text == u'More':
+        if anchor and anchor.text == 'More':
             return anchor.get('href').lstrip(BASE_URL)
         else:
             return None
@@ -320,8 +321,14 @@ class Story(object):
                         body = '[deleted]'
                         body_html = '[deleted]'
 
-                    comment = Comment(comment_id, level, user, time_ago,
-                                      body, body_html)
+                    comment = Comment(
+                        comment_id=comment_id,
+                        level=level,
+                        user=user,
+                        time_ago=time_ago,
+                        body=body,
+                        body_html=body_html,
+                    )
                     comments.append(comment)
 
             # Move on to the next page of comments, or exit the loop if there
@@ -333,20 +340,10 @@ class Story(object):
             soup = get_soup(page=next_page_url)
             current_page += 1
 
-        previous_comment = None
-        # for comment in comments:
-        # if comment.level == 0:
-        #         previous_comment = comment
-        #     else:
-        #         level_difference = comment.level - previous_comment.level
-        #         previous_comment.body_html += '\n' + '\t' * level_difference \
-        #                                       + comment.body_html
-        #         previous_comment.body += '\n' + '\t' * level_difference + \
-        #                                  comment.body
         return comments
 
     @classmethod
-    def fromid(self, item_id):
+    def fromid(cls, item_id):
         """
         Initializes an instance of Story for given item_id.
         It is assumed that the story referenced by item_id is valid
@@ -358,7 +355,7 @@ class Story(object):
         # get details about a particular story
         soup = get_item_soup(item_id)
 
-        # this post has not been scraped, so we explititly get all info
+        # this post has not been scraped, so we explicitly get all info
         story_id = item_id
         rank = -1
 
@@ -396,9 +393,20 @@ class Story(object):
                 4].text).groups()[0])
         except AttributeError:
             num_comments = 0
-        story = Story(rank, story_id, title, link, domain, points, submitter,
-                      published_time, submitter_profile, num_comments,
-                      comments_link, is_self)
+        story = Story(
+            rank=rank,
+            story_id=story_id,
+            title=title,
+            link=link,
+            domain=domain,
+            points=points,
+            submitter=submitter,
+            published_time=published_time,
+            submitter_profile=submitter_profile,
+            num_comments=num_comments,
+            comments_link=comments_link,
+            is_self=is_self,
+        )
         return story
 
     def get_comments(self):
@@ -409,18 +417,17 @@ class Story(object):
         return self._build_comments(soup)
 
 
-class Comment(object):
+class Comment(BaseModel):
     """
     Represents a comment on a post on HN
     """
 
-    def __init__(self, comment_id, level, user, time_ago, body, body_html):
-        self.comment_id = comment_id  # the comment's item id
-        self.level = level  # comment's nesting level
-        self.user = user  # user's name who submitted the post
-        self.time_ago = time_ago  # time when it was submitted
-        self.body = body  # text representation of comment (unformatted)
-        self.body_html = body_html  # html of comment, may not be valid
+    comment_id: int
+    level: int
+    user: str
+    time_ago: str
+    body: str
+    body_html: str
 
     def __repr__(self):
         """
@@ -429,16 +436,15 @@ class Comment(object):
         return '<Comment: ID={0}>'.format(self.comment_id)
 
 
-class User(object):
+class User(BaseModel):
     """
     Represents a User on HN
     """
 
-    def __init__(self, username, date_created, karma, avg):
-        self.username = username
-        self.date_created = date_created
-        self.karma = karma
-        self.avg = avg
+    username: str
+    date_created: str
+    karma: str
+    avg: str
 
     def __repr__(self):
         return '{0} {1} {2}'.format(self.username, self.karma, self.avg)
