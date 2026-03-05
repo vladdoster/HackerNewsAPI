@@ -10,6 +10,7 @@ Unofficial Python API for Hacker News.
 
 import re
 
+from pydantic.dataclasses import dataclass
 from .utils import get_soup, get_item_soup
 from .constants import BASE_URL
 
@@ -75,9 +76,15 @@ class HN(object):
             is_self = False
 
             # the link doesn't contains "http" meaning an internal link
-            if link.find('item?id=') is -1:
-                # slice " (abc.com) "
-                domain = info_cells[2].findAll('span')[1].string[2:-1]
+            if link.find('item?id=') == -1:
+                span_tags = info_cells[2].findAll('span')
+                if len(span_tags) > 1 and span_tags[1].string:
+                    # slice " (abc.com) "
+                    domain = span_tags[1].string[2:-1]
+                else:
+                    link = '%s/%s' % (BASE_URL, link.lstrip('/'))
+                    domain = BASE_URL
+                    is_self = True
             else:
                 link = '%s/%s' % (BASE_URL, link)
                 domain = BASE_URL
@@ -129,9 +136,20 @@ class HN(object):
                 comment_count = -1
             #-- Get the detail about a story --#
 
-            story = Story(rank, story_id, title, link, domain, points,
-                          submitter, published_time, submitter_profile,
-                          num_comments, comments_link, is_self)
+            story = Story(
+                rank=rank,
+                story_id=story_id,
+                title=title,
+                link=link,
+                domain=domain,
+                points=points,
+                submitter=submitter,
+                published_time=published_time,
+                submitter_profile=submitter_profile,
+                num_comments=num_comments,
+                comments_link=comments_link,
+                is_self=is_self,
+            )
 
             all_stories.append(story)
 
@@ -191,26 +209,24 @@ class HN(object):
                 yield User(item[1].text, '', item[2].text, item[3].text)
 
 
+@dataclass
 class Story(object):
     """
     Story class represents one single story on HN
     """
 
-    def __init__(self, rank, story_id, title, link, domain, points,
-                 submitter, published_time, submitter_profile, num_comments,
-                 comments_link, is_self):
-        self.rank = rank  # the rank of story on the page
-        self.story_id = story_id  # the story's id
-        self.title = title  # the title of the story
-        self.link = link  # the url it points to (None for self posts)
-        self.domain = domain  # the domain of the link (None for self posts)
-        self.points = points  # the points/karma on the story
-        self.submitter = submitter  # the user who submitted the story
-        self.published_time = published_time  # publish time of story
-        self.submitter_profile = submitter_profile  # link to submitter profile
-        self.num_comments = num_comments  # the number of comments it has
-        self.comments_link = comments_link  # the link to the comments page
-        self.is_self = is_self  # Truw is a self post
+    rank: int
+    story_id: int
+    title: str
+    link: str
+    domain: str
+    points: int
+    submitter: str
+    published_time: str
+    submitter_profile: str
+    num_comments: int
+    comments_link: str
+    is_self: bool
 
     def __repr__(self):
         """
@@ -396,9 +412,20 @@ class Story(object):
                 4].text).groups()[0])
         except AttributeError:
             num_comments = 0
-        story = Story(rank, story_id, title, link, domain, points, submitter,
-                      published_time, submitter_profile, num_comments,
-                      comments_link, is_self)
+        story = Story(
+            rank=rank,
+            story_id=story_id,
+            title=title,
+            link=link,
+            domain=domain,
+            points=points,
+            submitter=submitter,
+            published_time=published_time,
+            submitter_profile=submitter_profile,
+            num_comments=num_comments,
+            comments_link=comments_link,
+            is_self=is_self,
+        )
         return story
 
     def get_comments(self):
@@ -409,18 +436,18 @@ class Story(object):
         return self._build_comments(soup)
 
 
+@dataclass
 class Comment(object):
     """
     Represents a comment on a post on HN
     """
 
-    def __init__(self, comment_id, level, user, time_ago, body, body_html):
-        self.comment_id = comment_id  # the comment's item id
-        self.level = level  # comment's nesting level
-        self.user = user  # user's name who submitted the post
-        self.time_ago = time_ago  # time when it was submitted
-        self.body = body  # text representation of comment (unformatted)
-        self.body_html = body_html  # html of comment, may not be valid
+    comment_id: int
+    level: int
+    user: str
+    time_ago: str
+    body: str
+    body_html: str
 
     def __repr__(self):
         """
@@ -429,16 +456,16 @@ class Comment(object):
         return '<Comment: ID={0}>'.format(self.comment_id)
 
 
+@dataclass
 class User(object):
     """
     Represents a User on HN
     """
 
-    def __init__(self, username, date_created, karma, avg):
-        self.username = username
-        self.date_created = date_created
-        self.karma = karma
-        self.avg = avg
+    username: str
+    date_created: str
+    karma: str
+    avg: str
 
     def __repr__(self):
         return '{0} {1} {2}'.format(self.username, self.karma, self.avg)

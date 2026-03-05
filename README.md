@@ -11,7 +11,7 @@ Unofficial Python API for [Hacker News](https://news.ycombinator.com/).
 Features
 ========
 
-- Compatible with Python 2 (2.7+).
+- Compatible with Python 3.
 - Supports 'top', 'news2','newest' and 'best' posts
 - Retrieve comments from posts (flat list for now) (`story.get_comments()`)
 - Pagination support for comments
@@ -21,6 +21,12 @@ Features
 
 Installation
 ========
+
+Dependencies are managed in `pyproject.toml` and installed with `up`:
+
+    $ up sync
+
+To install from PyPI:
 
     $ pip install HackerNews
 
@@ -158,12 +164,11 @@ Tests
 
 To run the tests locally just do:
 
-    $ chmod 777 runtests.sh
-    $ ./runtests.sh
+    $ up run pytest
 
 To run individual tests,
 
-    $ python -m unittest tests.<module name>
+    $ up run pytest tests/<module_name>.py
 
 The tests are run on a local test server with predownloaded original responses.
 
