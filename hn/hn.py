@@ -115,46 +115,39 @@ class Story(BaseModel):
                     level = int(row.find_all('td')[1].find('img').get(
                         'width')) // 40
 
-                    spans = row.find_all('td')[3].find_all('span')
-                    # span[0] = submitter details
-                    # [<a href="user?id=jonknee">jonknee</a>, ' 1 hour ago  | ', <a href="item?id=6910978">link</a>]
-                    # span[1] = actual comment
+                    comment_cell = row.find_all('td')[3]
+                    header_span = comment_cell.find('span', class_='comhead')
+                    comment_span = comment_cell.find(
+                        'span', class_=re.compile(r'(commtext|comment)'))
 
-                    if str(spans[0]) != '<span class="comhead"></span>':
-                        # user who submitted the comment
-                        user = spans[0].contents[0].string
-                        # relative time of comment
-                        time_ago = spans[0].contents[1].string.strip(
-                        ).rstrip(' |')
-                        try:
-                            comment_id = int(re.match(r'item\?id=(.*)',
-                                                      spans[0].contents[
-                                                          2].get(
-                                                          'href')).groups()[0])
-                        except AttributeError:
-                            comment_id = int(re.match(r'%s/item\?id=(.*)' %
-                                                      BASE_URL,
-                                                      spans[0].contents[
-                                                          2].get(
-                                                          'href')).groups()[0])
+                    if header_span and str(header_span) != '<span class="comhead"></span>':
+                        user_link = header_span.find('a', class_='hnuser')
+                        user = user_link.text if user_link else ''
+
+                        age_span = header_span.find('span', class_='age')
+                        if age_span and age_span.find('a'):
+                            time_ago = age_span.find('a').text
+                            comment_href = age_span.find('a').get('href')
+                        else:
+                            time_ago = ''
+                            comment_href = ''
+                            for anchor in header_span.find_all('a'):
+                                href = anchor.get('href')
+                                if href and 'item?id=' in href:
+                                    comment_href = href
+                                    break
+
+                        match = re.match(r'.*item\?id=(\d+)', comment_href)
+                        comment_id = int(match.groups()[0]) if match else -1
 
                         # text representation of comment (unformatted)
-                        body = spans[1].text
+                        body = comment_span.text if comment_span else ''
 
                         if body[-2:] == '--':
                             body = body[:-5]
 
                         # html of comment, may not be valid
-                        try:
-                            pat = re.compile(
-                                r'<span class="comment"><font color=".*">(.*)</font></span>')
-                            body_html = re.match(pat, str(spans[1]).replace(
-                                '\n', '')).groups()[0]
-                        except AttributeError:
-                            pat = re.compile(
-                                r'<span class="comment"><font color=".*">(.*)</font></p><p><font size="1">')
-                            body_html = re.match(pat, str(spans[1]).replace(
-                                '\n', '')).groups()[0]
+                        body_html = comment_span.decode_contents() if comment_span else ''
 
                     else:
                         # comment deleted
@@ -343,6 +336,8 @@ class HN:
             #-- Get the info about a story --#
 
             #-- Get the detail about a story --#
+            story_id = int(info.get('id')) if info.get('id') else -1
+
             # split in 2 cells, we need only second
             detail_cell = detail.find_all('td')[1]
             # list of details we need, 5 count
@@ -350,7 +345,36 @@ class HN:
 
             num_comments = -1
 
-            if re.match(r'^(\d+)\spoint.*', detail_concern[0].string) is not \
+            subline = detail_cell.find('span', class_='subline')
+            if subline:
+                points_span = subline.find('span', class_='score')
+                if points_span:
+                    points = int(re.match(r'^(\d+)\spoint.*',
+                                          points_span.text).groups()[0])
+                else:
+                    points = 0
+
+                user_link = subline.find('a', class_='hnuser')
+                if user_link:
+                    submitter = user_link.text
+                    submitter_profile = f'{BASE_URL}/{user_link.get("href")}'
+                else:
+                    submitter = ''
+                    submitter_profile = ''
+
+                age_span = subline.find('span', class_='age')
+                published_time = age_span.find('a').text if age_span else ''
+
+                comments_link = f'{BASE_URL}/item?id={story_id}'
+                num_comments = 0
+                for a_tag in subline.find_all('a'):
+                    text = a_tag.text.replace('\xa0', ' ')
+                    match = re.match(r'(\d+)\s.*comment', text)
+                    if match:
+                        num_comments = int(match.groups()[0])
+                        comments_link = f'{BASE_URL}/{a_tag.get("href")}'
+                        break
+            elif re.match(r'^(\d+)\spoint.*', detail_concern[0].string) is not \
                     None:
                 # can be a link or self post
                 points = int(re.match(r'^(\d+)\spoint.*', detail_concern[
@@ -360,8 +384,9 @@ class HN:
                 published_time = ' '.join(detail_concern[3].strip().split()[
                                           :3])
                 comment_tag = detail_concern[4]
-                story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
-                    'href')).groups()[0])
+                if story_id == -1:
+                    story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
+                        'href')).groups()[0])
                 comments_link = f'{BASE_URL}/item?id={story_id}'
                 comment_count = re.match(r'(\d+)\s.*', comment_tag.string)
                 try:

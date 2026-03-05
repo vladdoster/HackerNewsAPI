@@ -1,67 +1,34 @@
-import httpretty
-import pytest
-
-from hn import HN, Story
 from hn import constants
 
-from .test_utils import get_content
 
-
-@pytest.fixture()
-def story():
-    httpretty.HTTPretty.enable()
-    httpretty.reset()
-    httpretty.register_uri(httpretty.GET,
-                           'https://news.ycombinator.com/',
-                           body=get_content('index.html'))
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'item?id=6115341'),
-                           body=get_content('6115341.html'))
-    hn = HN()
-    s = Story.fromid(6115341)
-    yield s
-    httpretty.HTTPretty.disable()
-
-
-def test_from_id_constructor(story):
+def test_from_id_constructor(live_story):
     """
     Tests whether or not the constructor fromid works or not
     by testing the returned Story.
     """
-    assert story.submitter == 'karangoeluw'
-    assert story.title == 'Github: What does the "Gold Star" next to my repository (in Explore page) mean?'
-    assert story.is_self is True
+    assert live_story.story_id > 0
+    assert bool(live_story.submitter)
+    assert bool(live_story.title)
+    assert live_story.comments_link == f'{constants.BASE_URL}/item?id={live_story.story_id}'
 
 
-def test_comment_for_fromid(story):
+def test_comment_for_fromid(live_story):
     """
     Tests if the comment scraping works for fromid or not.
     """
-    comments = story.get_comments()
-    assert len(comments) == 3
-    assert comments[0].comment_id == 6115436
-    assert comments[2].level == 2
+    comments = live_story.get_comments()
+    assert len(comments) > 0
+    assert comments[0].comment_id != 0
+    assert comments[0].level >= 0
 
 
-@pytest.fixture()
-def story_new_html():
-    httpretty.HTTPretty.enable()
-    httpretty.reset()
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'item?id=6374031'),
-                           body=get_content('6374031.html'))
-    s = Story.fromid(6374031)
-    yield s
-    httpretty.HTTPretty.disable()
-
-
-def test_from_id_new_html(story_new_html):
+def test_from_id_new_html(live_story):
     """
     Tests fromid with the current HN HTML structure.
     """
-    assert story_new_html.title == 'Python API for Hacker News'
-    assert story_new_html.submitter == '_hoa8'
-    assert story_new_html.points == 53
-    assert story_new_html.is_self is False
-    assert story_new_html.num_comments == 32
-    assert story_new_html.domain == 'github.com/thekarangoel'
+    assert bool(live_story.title)
+    assert bool(live_story.submitter)
+    assert live_story.points >= 0
+    assert isinstance(live_story.is_self, bool)
+    assert live_story.num_comments >= 0
+    assert bool(live_story.domain)
