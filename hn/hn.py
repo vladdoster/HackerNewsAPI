@@ -203,32 +203,69 @@ class Story(BaseModel):
         info_rows = info_table.find_all('tr')
 
         # title, domain
-        title_row = info_rows[0].find_all('td')[1]
-        title = title_row.find('a').text
-        try:
-            domain = title_row.find('span').string[2:-2]
-            # domain found
-            is_self = False
-            link = title_row.find('a').get('href')
-        except AttributeError:
-            # self post
-            domain = BASE_URL
-            is_self = True
-            link = f'{BASE_URL}/item?id={item_id}'
+        titleline = info_table.find('span', class_='titleline')
+        if titleline:
+            # New HN HTML structure
+            title = titleline.find('a').text
+            sitebit = titleline.find('span', class_='sitebit')
+            if sitebit:
+                domain = sitebit.text.strip().strip('()')
+                is_self = False
+                link = titleline.find('a').get('href')
+            else:
+                domain = BASE_URL
+                is_self = True
+                link = f'{BASE_URL}/item?id={item_id}'
+        else:
+            # Old HN HTML structure
+            title_row = info_rows[0].find_all('td')[1]
+            title = title_row.find('a').text
+            try:
+                domain = title_row.find('span').string[2:-2]
+                is_self = False
+                link = title_row.find('a').get('href')
+            except AttributeError:
+                domain = BASE_URL
+                is_self = True
+                link = f'{BASE_URL}/item?id={item_id}'
 
         # points, user, time, comments
-        meta_row = info_rows[1].find_all('td')[1].contents
+        subline = info_table.find('span', class_='subline')
+        if subline:
+            # New HN HTML structure
+            points_span = subline.find('span', class_='score')
+            points = int(re.match(r'^(\d+)\spoint.*',
+                                  points_span.text).groups()[0])
 
-        points = int(re.match(r'^(\d+)\spoint.*', meta_row[0].text).groups()[0])
-        submitter = meta_row[2].text
-        submitter_profile = f'{BASE_URL}/{meta_row[2].get("href")}'
-        published_time = ' '.join(meta_row[3].strip().split()[:3])
-        comments_link = f'{BASE_URL}/item?id={item_id}'
-        try:
-            num_comments = int(re.match(r'(\d+)\s.*', meta_row[
-                4].text).groups()[0])
-        except AttributeError:
+            user_link = subline.find('a', class_='hnuser')
+            submitter = user_link.text
+            submitter_profile = f'{BASE_URL}/{user_link.get("href")}'
+
+            age_span = subline.find('span', class_='age')
+            published_time = age_span.find('a').text if age_span else ''
+
+            comments_link = f'{BASE_URL}/item?id={item_id}'
             num_comments = 0
+            for a_tag in subline.find_all('a'):
+                match = re.match(r'(\d+)\s.*comment',
+                                 a_tag.text.replace('\xa0', ' '))
+                if match:
+                    num_comments = int(match.groups()[0])
+                    break
+        else:
+            # Old HN HTML structure
+            meta_row = info_rows[1].find_all('td')[1].contents
+            points = int(re.match(r'^(\d+)\spoint.*',
+                                  meta_row[0].text).groups()[0])
+            submitter = meta_row[2].text
+            submitter_profile = f'{BASE_URL}/{meta_row[2].get("href")}'
+            published_time = ' '.join(meta_row[3].strip().split()[:3])
+            comments_link = f'{BASE_URL}/item?id={item_id}'
+            try:
+                num_comments = int(re.match(r'(\d+)\s.*', meta_row[
+                    4].text).groups()[0])
+            except AttributeError:
+                num_comments = 0
         story = Story(rank=rank, story_id=story_id, title=title, link=link,
                       domain=domain, points=points, submitter=submitter,
                       published_time=published_time,

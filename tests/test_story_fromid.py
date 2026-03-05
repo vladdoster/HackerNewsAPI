@@ -41,3 +41,27 @@ def test_comment_for_fromid(story):
     assert len(comments) == 3
     assert comments[0].comment_id == 6115436
     assert comments[2].level == 2
+
+
+@pytest.fixture()
+def story_new_html():
+    httpretty.HTTPretty.enable()
+    httpretty.reset()
+    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
+                                                      'item?id=6374031'),
+                           body=get_content('6374031.html'))
+    s = Story.fromid(6374031)
+    yield s
+    httpretty.HTTPretty.disable()
+
+
+def test_from_id_new_html(story_new_html):
+    """
+    Tests fromid with the current HN HTML structure.
+    """
+    assert story_new_html.title == 'Python API for Hacker News'
+    assert story_new_html.submitter == '_hoa8'
+    assert story_new_html.points == 53
+    assert story_new_html.is_self is False
+    assert story_new_html.num_comments == 32
+    assert story_new_html.domain == 'github.com/thekarangoel'
