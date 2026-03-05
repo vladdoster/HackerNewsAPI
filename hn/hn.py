@@ -75,8 +75,8 @@ class HN(object):
             # by default all stories are linking posts
             is_self = False
 
-            # the link doesn't contains "http" meaning an internal link
-            if link.find('item?id=') == -1:
+            # the link doesn't contain "item?id=" meaning an external link
+            if 'item?id=' not in link:
                 span_tags = info_cells[2].findAll('span')
                 if len(span_tags) > 1 and span_tags[1].string:
                     # slice " (abc.com) "

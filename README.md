@@ -26,6 +26,10 @@ Dependencies are managed in `pyproject.toml` and installed with `up`:
 
     $ up sync
 
+Or with pip:
+
+    $ pip install -e ".[test]"
+
 To install from PyPI:
 
     $ pip install HackerNews
@@ -166,9 +170,17 @@ To run the tests locally just do:
 
     $ up run pytest
 
+Or with standard pytest:
+
+    $ pytest
+
 To run individual tests,
 
     $ up run pytest tests/<module_name>.py
+
+or
+
+    $ pytest tests/<module_name>.py
 
 The tests are run on a local test server with predownloaded original responses.
 
