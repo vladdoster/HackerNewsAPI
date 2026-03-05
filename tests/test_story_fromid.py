@@ -63,7 +63,7 @@ def test_fromid_new_html_format(story_new_format):
     """
     assert story_new_format.title == 'Python API for Hacker News'
     assert story_new_format.is_self is False
-    assert story_new_format.points > 0
+    assert story_new_format.points == 53
     assert story_new_format.submitter != ''
     assert story_new_format.num_comments == 32
     assert story_new_format.domain == 'github.com/thekarangoel'

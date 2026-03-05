@@ -247,16 +247,21 @@ class Story(BaseModel):
                 submitter_profile = href
             else:
                 submitter_profile = f'{BASE_URL}/{href}'
-        else:
+        elif len(meta_row) > 2:
             submitter = meta_row[2].text
             submitter_profile = f'{BASE_URL}/{meta_row[2].get("href")}'
+        else:
+            submitter = ''
+            submitter_profile = ''
 
         # Find published time
         age_span = container.find('span', class_='age')
         if age_span:
             published_time = age_span.text
-        else:
+        elif len(meta_row) > 3:
             published_time = ' '.join(meta_row[3].strip().split()[:3])
+        else:
+            published_time = ''
 
         comments_link = f'{BASE_URL}/item?id={item_id}'
 
