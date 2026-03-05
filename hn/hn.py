@@ -295,9 +295,10 @@ class HN:
             is_self = False
 
             # the link doesn't contain "http" meaning an internal link
-            if link.find('item?id=') == -1:
+            if 'item?id=' not in link:
                 # slice " (abc.com) "
-                domain = info_cells[2].find('span', class_='comhead').string[2:-2]
+                comhead = info_cells[2].find('span', class_='comhead')
+                domain = comhead.string[2:-2] if comhead and comhead.string else ''
             else:
                 link = f'{BASE_URL}/{link}'
                 domain = BASE_URL
