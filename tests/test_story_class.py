@@ -1,6 +1,5 @@
 import unittest
 from os import path
-import sys
 
 from hn import HN, Story
 from hn import utils, constants
@@ -18,11 +17,7 @@ class TestStory(unittest.TestCase):
                                                          'item?id=6115341'),
                                body=get_content('6115341.html'))
 
-        self.PY2 = sys.version_info[0] == 2
-        if not self.PY2:
-            self.text_type = [str]
-        else:
-            self.text_type = [unicode, str]
+        self.text_type = [str]
         # https://news.ycombinator.com/item?id=6115341
         self.story = Story.fromid(6115341)
 

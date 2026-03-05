@@ -1,6 +1,5 @@
 import unittest
 from os import path
-import sys
 
 from hn import HN, Story
 from hn import utils, constants
@@ -21,8 +20,6 @@ class TestStoryFromId(unittest.TestCase):
                                                          'item?id=6115341'),
                                body=get_content('6115341.html'))
 
-        # check py version
-        self.PY2 = sys.version_info[0] == 2
         self.hn = HN()
         self.story = Story.fromid(6115341)
 

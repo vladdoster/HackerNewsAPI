@@ -1,6 +1,5 @@
 import unittest
 from os import path
-import sys
 
 # from hn import HN, Story
 # from hn import utils, constants

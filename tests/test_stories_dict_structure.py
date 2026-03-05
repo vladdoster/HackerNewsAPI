@@ -1,6 +1,5 @@
 import unittest
 from os import path
-import sys
 
 from hn import HN, Story
 from hn import utils, constants
@@ -24,12 +23,7 @@ class TestStoriesDict(unittest.TestCase):
                                                          'newest'),
                                body=get_content('newest.html'))
 
-        # check py version
-        PY2 = sys.version_info[0] == 2
-        if not PY2:
-            self.text_type = [str]
-        else:
-            self.text_type = [unicode, str]
+        self.text_type = [str]
 
         self.hn = HN()
         self.top_stories = [story for story in self.hn.get_stories()]
