@@ -10,207 +10,29 @@ Unofficial Python API for Hacker News.
 
 import re
 
+from pydantic import BaseModel
+
 from .utils import get_soup, get_item_soup
 from .constants import BASE_URL
 
 
-class HN(object):
-    """
-    The class that parses the HN page, and builds up all stories
-    """
-
-    def __init__(self):
-        self.more = ''
-
-    # def _get_next_page(self, soup):
-    #     """
-    #     Get the relative url of the next page (The "More" link at
-    #     the bottom of the page)
-    #     """
-    #     table = soup.findChildren('table')[2]  # table with all submissions
-    #     # the last row of the table contains the relative url of the next
-    #     # page
-    #     return table.findChildren(['tr'])[-1].find('a').get('href').replace(
-    #         BASE_URL, '').lstrip('//')
-
-    def _get_zipped_rows(self, soup):
-        """
-        Returns all 'tr' tag rows as a list of tuples. Each tuple is for
-        a single story.
-        """
-        # the table with all submissions
-        table = soup.findChildren('table')[2]
-        # get all rows but last 2
-        rows = table.findChildren(['tr'])[:-2]
-        # remove the spacing rows
-        # indices of spacing tr's
-        spacing = range(2, len(rows), 3)
-        rows = [row for (i, row) in enumerate(rows) if (i not in spacing)]
-        # rank, title, domain
-        info = [row for (i, row) in enumerate(rows) if (i % 2 == 0)]
-        # points, submitter, comments
-        detail = [row for (i, row) in enumerate(rows) if (i % 2 != 0)]
-
-        # build a list of tuple for all post
-        return zip(info, detail)
-
-    def _build_story(self, all_rows):
-        """
-        Builds and returns a list of stories (dicts) from the passed source.
-        """
-        # list to hold all stories
-        all_stories = []
-
-        for (info, detail) in all_rows:
-
-            #-- Get the into about a story --#
-            # split in 3 cells
-            info_cells = info.findAll('td')
-
-            rank = int(info_cells[0].string[:-1])
-            title = '%s' % info_cells[2].find('a').string
-            link = info_cells[2].find('a').get('href')
-
-            # by default all stories are linking posts
-            is_self = False
-
-            # the link doesn't contains "http" meaning an internal link
-            if link.find('item?id=') is -1:
-                # slice " (abc.com) "
-                domain = info_cells[2].findAll('span')[1].string[2:-1]
-            else:
-                link = '%s/%s' % (BASE_URL, link)
-                domain = BASE_URL
-                is_self = True
-            #-- Get the into about a story --#
-
-            #-- Get the detail about a story --#
-            # split in 2 cells, we need only second
-            detail_cell = detail.findAll('td')[1]
-            # list of details we need, 5 count
-            detail_concern = detail_cell.contents
-
-            num_comments = -1
-
-            if re.match(r'^(\d+)\spoint.*', detail_concern[0].string) is not \
-                    None:
-                # can be a link or self post
-                points = int(re.match(r'^(\d+)\spoint.*', detail_concern[
-                    0].string).groups()[0])
-                submitter = '%s' % detail_concern[2].string
-                submitter_profile = '%s/%s' % (BASE_URL, detail_concern[
-                    2].get('href'))
-                published_time = ' '.join(detail_concern[3].strip().split()[
-                                          :3])
-                comment_tag = detail_concern[4]
-                story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
-                    'href')).groups()[0])
-                comments_link = '%s/item?id=%d' % (BASE_URL, story_id)
-                comment_count = re.match(r'(\d+)\s.*', comment_tag.string)
-                try:
-                    # regex matched, cast to int
-                    num_comments = int(comment_count.groups()[0])
-                except AttributeError:
-                    # did not match, assign 0
-                    num_comments = 0
-            else:
-                # this is a job post
-                points = 0
-                submitter = ''
-                submitter_profile = ''
-                published_time = '%s' % detail_concern[0]
-                comment_tag = ''
-                try:
-                    story_id = int(re.match(r'.*=(\d+)', link).groups()[0])
-                except AttributeError:
-                    # job listing that points to external link
-                    story_id = -1
-                comments_link = ''
-                comment_count = -1
-            #-- Get the detail about a story --#
-
-            story = Story(rank, story_id, title, link, domain, points,
-                          submitter, published_time, submitter_profile,
-                          num_comments, comments_link, is_self)
-
-            all_stories.append(story)
-
-        return all_stories
-
-    def get_stories(self, story_type='', limit=30):
-        """
-        Yields a list of stories from the passed page
-        of HN.
-        'story_type' can be:
-        \t'' = top stories (homepage) (default)
-        \t'news2' = page 2 of top stories
-        \t'newest' = most recent stories
-        \t'best' = best stories
-
-        'limit' is the number of stories required from the given page.
-        Defaults to 30. Cannot be more than 30.
-        """
-        if limit is None or limit < 1 or limit > 30:
-            # we need at least 30 items
-            limit = 30
-
-        stories_found = 0
-        # self.more = story_type
-        # while we still have more stories to find
-        while stories_found < limit:
-            # get current page soup
-            soup = get_soup(page=story_type)
-            all_rows = self._get_zipped_rows(soup)
-            # get a list of stories on current page
-            stories = self._build_story(all_rows)
-            # move to next page
-            # self.more = self._get_next_page(soup)
-
-            for story in stories:
-                yield story
-                stories_found += 1
-
-                # if enough stories found, return
-                if stories_found == limit:
-                    return
-
-    def get_leaders(self, limit=10):
-        """ Return the leaders of Hacker News """
-        if limit is None:
-            limit = 10
-        soup = get_soup('leaders')
-        table = soup.find('table')
-        leaders_table = table.find_all('table')[1]
-        listleaders = leaders_table.find_all('tr')[2:]
-        listleaders.pop(10)  # Removing because empty in the Leaders page
-        for i, leader in enumerate(listleaders):
-            if i == limit:
-                return
-            if not leader.text == '':
-                item = leader.find_all('td')
-                yield User(item[1].text, '', item[2].text, item[3].text)
-
-
-class Story(object):
+class Story(BaseModel):
     """
     Story class represents one single story on HN
     """
 
-    def __init__(self, rank, story_id, title, link, domain, points,
-                 submitter, published_time, submitter_profile, num_comments,
-                 comments_link, is_self):
-        self.rank = rank  # the rank of story on the page
-        self.story_id = story_id  # the story's id
-        self.title = title  # the title of the story
-        self.link = link  # the url it points to (None for self posts)
-        self.domain = domain  # the domain of the link (None for self posts)
-        self.points = points  # the points/karma on the story
-        self.submitter = submitter  # the user who submitted the story
-        self.published_time = published_time  # publish time of story
-        self.submitter_profile = submitter_profile  # link to submitter profile
-        self.num_comments = num_comments  # the number of comments it has
-        self.comments_link = comments_link  # the link to the comments page
-        self.is_self = is_self  # Truw is a self post
+    rank: int
+    story_id: int
+    title: str
+    link: str
+    domain: str
+    points: int
+    submitter: str
+    published_time: str
+    submitter_profile: str
+    num_comments: int
+    comments_link: str
+    is_self: bool
 
     def __repr__(self):
         """
@@ -226,13 +48,13 @@ class Story(object):
 
         # Get the table with all the comments:
         if current_page == 1:
-            table = soup.findChildren('table')[3]
+            table = soup.find_all('table')[3]
         elif current_page > 1:
-            table = soup.findChildren('table')[2]
+            table = soup.find_all('table')[2]
 
         # the last row of the table contains the relative url of the next page
-        anchor = table.findChildren(['tr'])[-1].find('a')
-        if anchor and anchor.text == u'More':
+        anchor = table.find_all(['tr'])[-1].find('a')
+        if anchor and anchor.text == 'More':
             return anchor.get('href').lstrip(BASE_URL)
         else:
             return None
@@ -248,11 +70,11 @@ class Story(object):
         while True:
             # Get the table holding all comments:
             if current_page == 1:
-                table = soup.findChildren('table')[3]
+                table = soup.find_all('table')[3]
             elif current_page > 1:
-                table = soup.findChildren('table')[2]
+                table = soup.find_all('table')[2]
             # get all rows (each comment is duplicated twice)
-            rows = table.findChildren(['tr'])
+            rows = table.find_all(['tr'])
             # last row is more, second last is spacing
             rows = rows[:len(rows) - 2]
             # now we have unique comments only
@@ -262,16 +84,16 @@ class Story(object):
                 for row in rows:
 
                     # skip an empty td
-                    if not row.findChildren('td'):
+                    if not row.find_all('td'):
                         continue
 
                     # Builds a flat list of comments
 
                     # level of comment, starting with 0
-                    level = int(row.findChildren('td')[1].find('img').get(
+                    level = int(row.find_all('td')[1].find('img').get(
                         'width')) // 40
 
-                    spans = row.findChildren('td')[3].findAll('span')
+                    spans = row.find_all('td')[3].find_all('span')
                     # span[0] = submitter details
                     # [<a href="user?id=jonknee">jonknee</a>, u' 1 hour ago  | ', <a href="item?id=6910978">link</a>]
                     # span[1] = actual comment
@@ -320,8 +142,9 @@ class Story(object):
                         body = '[deleted]'
                         body_html = '[deleted]'
 
-                    comment = Comment(comment_id, level, user, time_ago,
-                                      body, body_html)
+                    comment = Comment(comment_id=comment_id, level=level,
+                                      user=user, time_ago=time_ago,
+                                      body=body, body_html=body_html)
                     comments.append(comment)
 
             # Move on to the next page of comments, or exit the loop if there
@@ -333,20 +156,10 @@ class Story(object):
             soup = get_soup(page=next_page_url)
             current_page += 1
 
-        previous_comment = None
-        # for comment in comments:
-        # if comment.level == 0:
-        #         previous_comment = comment
-        #     else:
-        #         level_difference = comment.level - previous_comment.level
-        #         previous_comment.body_html += '\n' + '\t' * level_difference \
-        #                                       + comment.body_html
-        #         previous_comment.body += '\n' + '\t' * level_difference + \
-        #                                  comment.body
         return comments
 
     @classmethod
-    def fromid(self, item_id):
+    def fromid(cls, item_id):
         """
         Initializes an instance of Story for given item_id.
         It is assumed that the story referenced by item_id is valid
@@ -358,17 +171,17 @@ class Story(object):
         # get details about a particular story
         soup = get_item_soup(item_id)
 
-        # this post has not been scraped, so we explititly get all info
+        # this post has not been scraped, so we explicitly get all info
         story_id = item_id
         rank = -1
 
         # to extract meta information about the post
-        info_table = soup.findChildren('table')[2]
+        info_table = soup.find_all('table')[2]
         # [0] = title, domain, [1] = points, user, time, comments
-        info_rows = info_table.findChildren('tr')
+        info_rows = info_table.find_all('tr')
 
         # title, domain
-        title_row = info_rows[0].findChildren('td')[1]
+        title_row = info_rows[0].find_all('td')[1]
         title = title_row.find('a').text
         try:
             domain = title_row.find('span').string[2:-2]
@@ -382,10 +195,7 @@ class Story(object):
             link = '%s/item?id=%s' % (BASE_URL, item_id)
 
         # points, user, time, comments
-        meta_row = info_rows[1].findChildren('td')[1].contents
-        # [<span id="score_7024626">789 points</span>, u' by ', <a href="user?id=endianswap">endianswap</a>,
-        # u' 8 hours ago  | ', <a href="item?id=7024626">238 comments</a>]
-
+        meta_row = info_rows[1].find_all('td')[1].contents
         points = int(re.match(r'^(\d+)\spoint.*', meta_row[0].text).groups()[0])
         submitter = meta_row[2].text
         submitter_profile = '%s/%s' % (BASE_URL, meta_row[2].get('href'))
@@ -396,9 +206,12 @@ class Story(object):
                 4].text).groups()[0])
         except AttributeError:
             num_comments = 0
-        story = Story(rank, story_id, title, link, domain, points, submitter,
-                      published_time, submitter_profile, num_comments,
-                      comments_link, is_self)
+        story = Story(rank=rank, story_id=story_id, title=title, link=link,
+                      domain=domain, points=points, submitter=submitter,
+                      published_time=published_time,
+                      submitter_profile=submitter_profile,
+                      num_comments=num_comments, comments_link=comments_link,
+                      is_self=is_self)
         return story
 
     def get_comments(self):
@@ -409,18 +222,17 @@ class Story(object):
         return self._build_comments(soup)
 
 
-class Comment(object):
+class Comment(BaseModel):
     """
     Represents a comment on a post on HN
     """
 
-    def __init__(self, comment_id, level, user, time_ago, body, body_html):
-        self.comment_id = comment_id  # the comment's item id
-        self.level = level  # comment's nesting level
-        self.user = user  # user's name who submitted the post
-        self.time_ago = time_ago  # time when it was submitted
-        self.body = body  # text representation of comment (unformatted)
-        self.body_html = body_html  # html of comment, may not be valid
+    comment_id: int
+    level: int
+    user: str
+    time_ago: str
+    body: str
+    body_html: str
 
     def __repr__(self):
         """
@@ -429,16 +241,184 @@ class Comment(object):
         return '<Comment: ID={0}>'.format(self.comment_id)
 
 
-class User(object):
+class User(BaseModel):
     """
     Represents a User on HN
     """
 
-    def __init__(self, username, date_created, karma, avg):
-        self.username = username
-        self.date_created = date_created
-        self.karma = karma
-        self.avg = avg
+    username: str
+    date_created: str
+    karma: str
+    avg: str
 
     def __repr__(self):
         return '{0} {1} {2}'.format(self.username, self.karma, self.avg)
+
+
+class HN:
+    """
+    The class that parses the HN page, and builds up all stories
+    """
+
+    def __init__(self):
+        self.more = ''
+
+    def _get_zipped_rows(self, soup):
+        """
+        Returns all 'tr' tag rows as a list of tuples. Each tuple is for
+        a single story.
+        """
+        # the table with all submissions
+        table = soup.find_all('table')[2]
+        # get all rows but last 2
+        rows = table.find_all(['tr'])[:-2]
+        # remove the spacing rows
+        # indices of spacing tr's
+        spacing = range(2, len(rows), 3)
+        rows = [row for (i, row) in enumerate(rows) if (i not in spacing)]
+        # rank, title, domain
+        info = [row for (i, row) in enumerate(rows) if (i % 2 == 0)]
+        # points, submitter, comments
+        detail = [row for (i, row) in enumerate(rows) if (i % 2 != 0)]
+
+        # build a list of tuple for all post
+        return zip(info, detail)
+
+    def _build_story(self, all_rows):
+        """
+        Builds and returns a list of stories (dicts) from the passed source.
+        """
+        # list to hold all stories
+        all_stories = []
+
+        for (info, detail) in all_rows:
+
+            #-- Get the info about a story --#
+            # split in 3 cells
+            info_cells = info.find_all('td')
+
+            rank = int(info_cells[0].string[:-1])
+            title = '%s' % info_cells[2].find('a').string
+            link = info_cells[2].find('a').get('href')
+
+            # by default all stories are linking posts
+            is_self = False
+
+            # the link doesn't contain "http" meaning an internal link
+            if link.find('item?id=') == -1:
+                # slice " (abc.com) "
+                domain = info_cells[2].find_all('span')[0].string[2:-2]
+            else:
+                link = '%s/%s' % (BASE_URL, link)
+                domain = BASE_URL
+                is_self = True
+            #-- Get the info about a story --#
+
+            #-- Get the detail about a story --#
+            # split in 2 cells, we need only second
+            detail_cell = detail.find_all('td')[1]
+            # list of details we need, 5 count
+            detail_concern = detail_cell.contents
+
+            num_comments = -1
+
+            if re.match(r'^(\d+)\spoint.*', detail_concern[0].string) is not \
+                    None:
+                # can be a link or self post
+                points = int(re.match(r'^(\d+)\spoint.*', detail_concern[
+                    0].string).groups()[0])
+                submitter = '%s' % detail_concern[2].string
+                submitter_profile = '%s/%s' % (BASE_URL, detail_concern[
+                    2].get('href'))
+                published_time = ' '.join(detail_concern[3].strip().split()[
+                                          :3])
+                comment_tag = detail_concern[4]
+                story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
+                    'href')).groups()[0])
+                comments_link = '%s/item?id=%d' % (BASE_URL, story_id)
+                comment_count = re.match(r'(\d+)\s.*', comment_tag.string)
+                try:
+                    # regex matched, cast to int
+                    num_comments = int(comment_count.groups()[0])
+                except AttributeError:
+                    # did not match, assign 0
+                    num_comments = 0
+            else:
+                # this is a job post
+                points = 0
+                submitter = ''
+                submitter_profile = ''
+                published_time = '%s' % detail_concern[0]
+                comment_tag = ''
+                try:
+                    story_id = int(re.match(r'.*=(\d+)', link).groups()[0])
+                except AttributeError:
+                    # job listing that points to external link
+                    story_id = -1
+                comments_link = ''
+                comment_count = -1
+            #-- Get the detail about a story --#
+
+            story = Story(rank=rank, story_id=story_id, title=title,
+                          link=link, domain=domain, points=points,
+                          submitter=submitter,
+                          published_time=published_time,
+                          submitter_profile=submitter_profile,
+                          num_comments=num_comments,
+                          comments_link=comments_link, is_self=is_self)
+
+            all_stories.append(story)
+
+        return all_stories
+
+    def get_stories(self, story_type='', limit=30):
+        """
+        Yields a list of stories from the passed page
+        of HN.
+        'story_type' can be:
+        \t'' = top stories (homepage) (default)
+        \t'news2' = page 2 of top stories
+        \t'newest' = most recent stories
+        \t'best' = best stories
+
+        'limit' is the number of stories required from the given page.
+        Defaults to 30. Cannot be more than 30.
+        """
+        if limit is None or limit < 1 or limit > 30:
+            # we need at least 30 items
+            limit = 30
+
+        stories_found = 0
+        # self.more = story_type
+        # while we still have more stories to find
+        while stories_found < limit:
+            # get current page soup
+            soup = get_soup(page=story_type)
+            all_rows = self._get_zipped_rows(soup)
+            # get a list of stories on current page
+            stories = self._build_story(all_rows)
+
+            for story in stories:
+                yield story
+                stories_found += 1
+
+                # if enough stories found, return
+                if stories_found == limit:
+                    return
+
+    def get_leaders(self, limit=10):
+        """ Return the leaders of Hacker News """
+        if limit is None:
+            limit = 10
+        soup = get_soup('leaders')
+        table = soup.find('table')
+        leaders_table = table.find_all('table')[1]
+        listleaders = leaders_table.find_all('tr')[2:]
+        listleaders.pop(10)  # Removing because empty in the Leaders page
+        for i, leader in enumerate(listleaders):
+            if i == limit:
+                return
+            if not leader.text == '':
+                item = leader.find_all('td')
+                yield User(username=item[1].text, date_created='',
+                           karma=item[2].text, avg=item[3].text)
