@@ -1,36 +1,19 @@
-import httpretty
 import pytest
 
 from hn import HN, Story
-from hn import constants
-
-from .test_utils import get_content
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def stories_data():
-    httpretty.HTTPretty.enable()
-    httpretty.reset()
-    httpretty.register_uri(httpretty.GET,
-                           'https://news.ycombinator.com/',
-                           body=get_content('index.html'))
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'best'),
-                           body=get_content('best.html'))
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'newest'),
-                           body=get_content('newest.html'))
-
     hn = HN()
     top_stories = [story for story in hn.get_stories()]
     newest_stories = [story for story in hn.get_stories(story_type='newest')]
     best_stories = [story for story in hn.get_stories(story_type='best')]
-    yield {
+    return {
         'top': top_stories,
         'newest': newest_stories,
         'best': best_stories,
     }
-    httpretty.HTTPretty.disable()
 
 
 def _check_story_types(story):

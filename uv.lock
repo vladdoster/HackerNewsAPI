@@ -155,7 +155,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpretty" },
     { name = "pytest" },
 ]
 
@@ -167,16 +166,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpretty", specifier = ">=1.1" },
-    { name = "pytest", specifier = ">=8.0" },
-]
-
-[[package]]
-name = "httpretty"
-version = "1.1.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6e/19/850b7ed736319d0c4088581f4fc34f707ef14461947284026664641e16d4/httpretty-1.1.4.tar.gz", hash = "sha256:20de0e5dd5a18292d36d928cc3d6e52f8b2ac73daec40d41eb62dee154933b68", size = 442389, upload-time = "2021-08-16T19:35:31.4Z" }
+dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "idna"

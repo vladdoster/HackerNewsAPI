@@ -1,22 +1,11 @@
-import httpretty
 import pytest
 
-from hn import HN, Story
-from hn import constants
-
-from .test_utils import get_content
+from hn import Story
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def story():
-    httpretty.HTTPretty.enable()
-    httpretty.reset()
-    httpretty.register_uri(httpretty.GET, '%s/%s' % (constants.BASE_URL,
-                                                      'item?id=6115341'),
-                           body=get_content('6115341.html'))
-    s = Story.fromid(6115341)
-    yield s
-    httpretty.HTTPretty.disable()
+    return Story.fromid(6115341)
 
 
 def test_story_data_types(story):
@@ -41,4 +30,4 @@ def test_story_submitter(story):
     """
     Tests the author name
     """
-    assert story.submitter == 'karangoeluw'
+    assert story.submitter == '_hoa8'

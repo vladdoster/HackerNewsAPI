@@ -62,121 +62,53 @@ class Story(BaseModel):
     def __repr__(self):
         return f'<Story: ID={self.story_id}>'
 
-    def _get_next_page(self, soup, current_page):
-        """
-        Get the relative url of the next page (The "More" link at
-        the bottom of the page)
-        """
-
-        # Get the table with all the comments:
-        if current_page == 1:
-            table = soup.find_all('table')[3]
-        elif current_page > 1:
-            table = soup.find_all('table')[2]
-
-        # the last row of the table contains the relative url of the next page
-        anchor = table.find_all(['tr'])[-1].find('a')
-        if anchor and anchor.text == 'More':
-            return anchor.get('href').lstrip(BASE_URL)
-        else:
-            return None
-
     def _build_comments(self, soup):
         """
         For the story, builds and returns a list of Comment objects.
         """
 
         comments = []
-        current_page = 1
 
-        while True:
-            # Get the table holding all comments:
-            if current_page == 1:
-                table = soup.find_all('table')[3]
-            elif current_page > 1:
-                table = soup.find_all('table')[2]
-            # get all rows (each comment is duplicated twice)
-            rows = table.find_all(['tr'])
-            # last row is more, second last is spacing
-            rows = rows[:len(rows) - 2]
-            # now we have unique comments only
-            rows = [row for i, row in enumerate(rows) if (i % 2 == 0)]
+        comment_tree = soup.find('table', class_='comment-tree')
+        if not comment_tree:
+            return comments
 
-            if len(rows) > 1:
-                for row in rows:
+        for row in comment_tree.find_all('tr', class_='athing'):
+            try:
+                comment_id = int(row.get('id'))
+            except (TypeError, ValueError):
+                continue
 
-                    # skip an empty td
-                    if not row.find_all('td'):
-                        continue
+            ind_td = row.find('td', class_='ind')
+            try:
+                level = int(ind_td.get('indent', 0))
+            except (TypeError, ValueError):
+                level = 0
 
-                    # Builds a flat list of comments
+            user_a = row.find('a', class_='hnuser')
+            if user_a:
+                user = user_a.text
+                age_span = row.find('span', class_='age')
+                time_ago = age_span.find('a').text if age_span else ''
+                commtext = row.find(class_='commtext')
+                if commtext:
+                    body = commtext.text
+                    body_html = str(commtext)
+                else:
+                    body = ''
+                    body_html = ''
+            else:
+                # deleted comment
+                user = ''
+                time_ago = ''
+                comment_id = -1
+                body = '[deleted]'
+                body_html = '[deleted]'
 
-                    # level of comment, starting with 0
-                    level = int(row.find_all('td')[1].find('img').get(
-                        'width')) // 40
-
-                    spans = row.find_all('td')[3].find_all('span')
-                    # span[0] = submitter details
-                    # [<a href="user?id=jonknee">jonknee</a>, ' 1 hour ago  | ', <a href="item?id=6910978">link</a>]
-                    # span[1] = actual comment
-
-                    if str(spans[0]) != '<span class="comhead"></span>':
-                        # user who submitted the comment
-                        user = spans[0].contents[0].string
-                        # relative time of comment
-                        time_ago = spans[0].contents[1].string.strip(
-                        ).rstrip(' |')
-                        try:
-                            comment_id = int(re.match(r'item\?id=(.*)',
-                                                      spans[0].contents[
-                                                          2].get(
-                                                          'href')).groups()[0])
-                        except AttributeError:
-                            comment_id = int(re.match(r'%s/item\?id=(.*)' %
-                                                      BASE_URL,
-                                                      spans[0].contents[
-                                                          2].get(
-                                                          'href')).groups()[0])
-
-                        # text representation of comment (unformatted)
-                        body = spans[1].text
-
-                        if body[-2:] == '--':
-                            body = body[:-5]
-
-                        # html of comment, may not be valid
-                        try:
-                            pat = re.compile(
-                                r'<span class="comment"><font color=".*">(.*)</font></span>')
-                            body_html = re.match(pat, str(spans[1]).replace(
-                                '\n', '')).groups()[0]
-                        except AttributeError:
-                            pat = re.compile(
-                                r'<span class="comment"><font color=".*">(.*)</font></p><p><font size="1">')
-                            body_html = re.match(pat, str(spans[1]).replace(
-                                '\n', '')).groups()[0]
-
-                    else:
-                        # comment deleted
-                        user = ''
-                        time_ago = ''
-                        comment_id = -1
-                        body = '[deleted]'
-                        body_html = '[deleted]'
-
-                    comment = Comment(comment_id=comment_id, level=level,
-                                      user=user, time_ago=time_ago,
-                                      body=body, body_html=body_html)
-                    comments.append(comment)
-
-            # Move on to the next page of comments, or exit the loop if there
-            # is no next page.
-            next_page_url = self._get_next_page(soup, current_page)
-            if not next_page_url:
-                break
-
-            soup = get_soup(page=next_page_url)
-            current_page += 1
+            comment = Comment(comment_id=comment_id, level=level,
+                              user=user, time_ago=time_ago,
+                              body=body, body_html=body_html)
+            comments.append(comment)
 
         return comments
 
@@ -297,16 +229,11 @@ class HN:
         """
         # the table with all submissions
         table = soup.find_all('table')[2]
-        # get all rows but last 2
-        rows = table.find_all(['tr'])[:-2]
-        # remove the spacing rows
-        # indices of spacing tr's
-        spacing = range(2, len(rows), 3)
-        rows = [row for (i, row) in enumerate(rows) if (i not in spacing)]
-        # rank, title, domain
-        info = [row for (i, row) in enumerate(rows) if (i % 2 == 0)]
-        # points, submitter, comments
-        detail = [row for (i, row) in enumerate(rows) if (i % 2 != 0)]
+        all_rows = table.find_all(['tr'])
+        # info rows: class includes 'athing'
+        info = [r for r in all_rows if 'athing' in (r.get('class') or [])]
+        # detail rows: td.subtext is present (or no class, follows an athing row)
+        detail = [r for r in all_rows if r.find('td', class_='subtext')]
 
         # build a list of tuple for all post
         return zip(info, detail)
@@ -321,21 +248,28 @@ class HN:
         for (info, detail) in all_rows:
 
             #-- Get the info about a story --#
-            # split in 3 cells
             info_cells = info.find_all('td')
 
-            rank = int(info_cells[0].string[:-1])
-            title = '%s' % info_cells[2].find('a').string
-            link = info_cells[2].find('a').get('href')
+            rank_span = info_cells[0].find('span', class_='rank')
+            try:
+                rank = int(rank_span.text.rstrip('.'))
+            except (AttributeError, ValueError):
+                rank = -1
+
+            titleline = info_cells[2].find('span', class_='titleline')
+            title = titleline.find('a').text
+            link = titleline.find('a').get('href')
 
             # by default all stories are linking posts
             is_self = False
 
-            # the link doesn't contain "http" meaning an internal link
             if 'item?id=' not in link:
-                # slice " (abc.com) "
-                comhead = info_cells[2].find('span', class_='comhead')
-                domain = comhead.string[2:-2] if comhead and comhead.string else ''
+                sitebit = titleline.find('span', class_='sitebit')
+                if sitebit:
+                    sitestr = sitebit.find('span', class_='sitestr')
+                    domain = sitestr.text if sitestr else ''
+                else:
+                    domain = ''
             else:
                 link = f'{BASE_URL}/{link}'
                 domain = BASE_URL
@@ -343,47 +277,51 @@ class HN:
             #-- Get the info about a story --#
 
             #-- Get the detail about a story --#
-            # split in 2 cells, we need only second
-            detail_cell = detail.find_all('td')[1]
-            # list of details we need, 5 count
-            detail_concern = detail_cell.contents
+            detail_cell = detail.find('td', class_='subtext')
+            subline = detail_cell.find('span', class_='subline') if detail_cell else None
 
-            num_comments = -1
+            num_comments = 0
 
-            if re.match(r'^(\d+)\spoint.*', detail_concern[0].string) is not \
-                    None:
+            if subline:
                 # can be a link or self post
-                points = int(re.match(r'^(\d+)\spoint.*', detail_concern[
-                    0].string).groups()[0])
-                submitter = '%s' % detail_concern[2].string
-                submitter_profile = f'{BASE_URL}/{detail_concern[2].get("href")}'
-                published_time = ' '.join(detail_concern[3].strip().split()[
-                                          :3])
-                comment_tag = detail_concern[4]
-                story_id = int(re.match(r'.*=(\d+)', comment_tag.get(
-                    'href')).groups()[0])
-                comments_link = f'{BASE_URL}/item?id={story_id}'
-                comment_count = re.match(r'(\d+)\s.*', comment_tag.string)
-                try:
-                    # regex matched, cast to int
-                    num_comments = int(comment_count.groups()[0])
-                except AttributeError:
-                    # did not match, assign 0
-                    num_comments = 0
+                score_span = subline.find('span', class_='score')
+                if score_span:
+                    points = int(re.match(r'^(\d+)\s', score_span.text).group(1))
+                else:
+                    points = 0
+
+                user_a = subline.find('a', class_='hnuser')
+                submitter = user_a.text if user_a else ''
+                submitter_profile = f'{BASE_URL}/{user_a.get("href")}' if user_a else ''
+
+                age_span = subline.find('span', class_='age')
+                published_time = age_span.find('a').text if age_span else ''
+
+                story_id = -1
+                comments_link = ''
+                for a_tag in subline.find_all('a'):
+                    href = a_tag.get('href', '')
+                    m = re.match(r'item\?id=(\d+)', href)
+                    if m:
+                        story_id = int(m.group(1))
+                        comment_match = re.match(r'(\d+)\s', a_tag.text)
+                        if comment_match:
+                            num_comments = int(comment_match.group(1))
+                            comments_link = f'{BASE_URL}/item?id={story_id}'
+                if not comments_link and story_id != -1:
+                    comments_link = f'{BASE_URL}/item?id={story_id}'
             else:
                 # this is a job post
                 points = 0
                 submitter = ''
                 submitter_profile = ''
-                published_time = '%s' % detail_concern[0]
-                comment_tag = ''
+                published_time = detail_cell.text.strip() if detail_cell else ''
                 try:
                     story_id = int(re.match(r'.*=(\d+)', link).groups()[0])
                 except AttributeError:
                     # job listing that points to external link
                     story_id = -1
                 comments_link = ''
-                comment_count = -1
             #-- Get the detail about a story --#
 
             story = Story(rank=rank, story_id=story_id, title=title,
@@ -439,12 +377,12 @@ class HN:
         soup = get_soup('leaders')
         table = soup.find('table')
         leaders_table = table.find_all('table')[1]
-        listleaders = leaders_table.find_all('tr')[2:]
-        listleaders.pop(10)  # Removing because empty in the Leaders page
-        for i, leader in enumerate(listleaders):
+        leader_rows = leaders_table.find_all('tr', class_='athing')
+        for i, leader in enumerate(leader_rows):
             if i == limit:
                 return
-            if not leader.text == '':
-                item = leader.find_all('td')
-                yield User(username=item[1].text, date_created='',
-                           karma=item[2].text, avg=item[3].text)
+            item = leader.find_all('td')
+            user_a = item[1].find('a', class_='hnuser') if len(item) > 1 else None
+            username = user_a.text if user_a else item[1].text
+            karma = item[2].text if len(item) > 2 else ''
+            yield User(username=username, date_created='', karma=karma, avg='')

@@ -42,7 +42,6 @@ packages = ["hn"]
 
 [dependency-groups]
 dev = [
-    "httpretty>=1.1",
     "pytest>=8.0",
 ]
 
