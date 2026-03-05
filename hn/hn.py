@@ -247,10 +247,10 @@ class Story(BaseModel):
             comments_link = f'{BASE_URL}/item?id={item_id}'
             num_comments = 0
             for a_tag in subline.find_all('a'):
-                if re.match(r'(\d+)\s.*comment', a_tag.text.replace('\xa0', ' ')):
-                    num_comments = int(re.match(
-                        r'(\d+)\s.*', a_tag.text.replace('\xa0', ' ')
-                    ).groups()[0])
+                match = re.match(r'(\d+)\s.*comment',
+                                 a_tag.text.replace('\xa0', ' '))
+                if match:
+                    num_comments = int(match.groups()[0])
                     break
         else:
             # Old HN HTML structure
