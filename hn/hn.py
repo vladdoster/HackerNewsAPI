@@ -70,12 +70,12 @@ class Story(BaseModel):
 
         # Get the table with all the comments:
         if current_page == 1:
-            table = soup.findChildren('table')[3]
+            table = soup.find_all('table')[3]
         elif current_page > 1:
-            table = soup.findChildren('table')[2]
+            table = soup.find_all('table')[2]
 
         # the last row of the table contains the relative url of the next page
-        anchor = table.findChildren(['tr'])[-1].find('a')
+        anchor = table.find_all(['tr'])[-1].find('a')
         if anchor and anchor.text == 'More':
             return anchor.get('href').lstrip(BASE_URL)
         else:
@@ -92,11 +92,11 @@ class Story(BaseModel):
         while True:
             # Get the table holding all comments:
             if current_page == 1:
-                table = soup.findChildren('table')[3]
+                table = soup.find_all('table')[3]
             elif current_page > 1:
-                table = soup.findChildren('table')[2]
+                table = soup.find_all('table')[2]
             # get all rows (each comment is duplicated twice)
-            rows = table.findChildren(['tr'])
+            rows = table.find_all(['tr'])
             # last row is more, second last is spacing
             rows = rows[:len(rows) - 2]
             # now we have unique comments only
@@ -106,16 +106,16 @@ class Story(BaseModel):
                 for row in rows:
 
                     # skip an empty td
-                    if not row.findChildren('td'):
+                    if not row.find_all('td'):
                         continue
 
                     # Builds a flat list of comments
 
                     # level of comment, starting with 0
-                    level = int(row.findChildren('td')[1].find('img').get(
+                    level = int(row.find_all('td')[1].find('img').get(
                         'width')) // 40
 
-                    spans = row.findChildren('td')[3].findAll('span')
+                    spans = row.find_all('td')[3].find_all('span')
                     # span[0] = submitter details
                     # [<a href="user?id=jonknee">jonknee</a>, ' 1 hour ago  | ', <a href="item?id=6910978">link</a>]
                     # span[1] = actual comment
@@ -198,12 +198,12 @@ class Story(BaseModel):
         rank = -1
 
         # to extract meta information about the post
-        info_table = soup.findChildren('table')[2]
+        info_table = soup.find_all('table')[2]
         # [0] = title, domain, [1] = points, user, time, comments
-        info_rows = info_table.findChildren('tr')
+        info_rows = info_table.find_all('tr')
 
         # title, domain
-        title_row = info_rows[0].findChildren('td')[1]
+        title_row = info_rows[0].find_all('td')[1]
         title = title_row.find('a').text
         try:
             domain = title_row.find('span').string[2:-2]
@@ -217,7 +217,7 @@ class Story(BaseModel):
             link = f'{BASE_URL}/item?id={item_id}'
 
         # points, user, time, comments
-        meta_row = info_rows[1].findChildren('td')[1].contents
+        meta_row = info_rows[1].find_all('td')[1].contents
 
         points = int(re.match(r'^(\d+)\spoint.*', meta_row[0].text).groups()[0])
         submitter = meta_row[2].text
@@ -259,9 +259,9 @@ class HN:
         a single story.
         """
         # the table with all submissions
-        table = soup.findChildren('table')[2]
+        table = soup.find_all('table')[2]
         # get all rows but last 2
-        rows = table.findChildren(['tr'])[:-2]
+        rows = table.find_all(['tr'])[:-2]
         # remove the spacing rows
         # indices of spacing tr's
         spacing = range(2, len(rows), 3)
@@ -285,7 +285,7 @@ class HN:
 
             #-- Get the info about a story --#
             # split in 3 cells
-            info_cells = info.findAll('td')
+            info_cells = info.find_all('td')
 
             rank = int(info_cells[0].string[:-1])
             title = '%s' % info_cells[2].find('a').string
@@ -307,7 +307,7 @@ class HN:
 
             #-- Get the detail about a story --#
             # split in 2 cells, we need only second
-            detail_cell = detail.findAll('td')[1]
+            detail_cell = detail.find_all('td')[1]
             # list of details we need, 5 count
             detail_concern = detail_cell.contents
 
