@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+"""
+Utility functions for Hacker News API.
+"""
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,8 +12,8 @@ def get_soup(page=''):
     """
     Returns a bs4 object of the page requested
     """
-    content = requests.get('%s/%s' % (BASE_URL, page)).text
-    return BeautifulSoup(content)
+    content = requests.get(f'{BASE_URL}/{page}').text
+    return BeautifulSoup(content, 'html.parser')
 
 
 def get_item_soup(story_id):

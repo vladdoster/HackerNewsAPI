@@ -1,4 +1,5 @@
 *.py[cod]
+__pycache__/
 
 # C extensions
 *.so
@@ -17,7 +18,11 @@ develop-eggs
 .installed.cfg
 lib
 lib64
+
+# Virtual environments
 venv
+.venv
+
 # ide files
 .idea
 
@@ -30,6 +35,7 @@ pip-log.txt
 .coverage
 .tox
 nosetests.xml
+.pytest_cache/
 
 # Translations
 *.mo
